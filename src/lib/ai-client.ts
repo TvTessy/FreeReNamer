@@ -68,7 +68,8 @@ async function chatOllama(
   });
 
   if (!response.ok) {
-    throw new Error(`Ollama API error: ${response.status}`);
+    const errorBody = await response.text().catch(() => '');
+    throw new Error(`Ollama API error: ${response.status} - ${errorBody}`);
   }
 
   const data: OllamaResponse = await response.json();
@@ -112,7 +113,8 @@ async function chatOpenAI(
   });
 
   if (!response.ok) {
-    throw new Error(`OpenAI API error: ${response.status}`);
+    const errorBody = await response.text().catch(() => '');
+    throw new Error(`API error ${response.status}: ${errorBody}`);
   }
 
   const data: OpenAIResponse = await response.json();
