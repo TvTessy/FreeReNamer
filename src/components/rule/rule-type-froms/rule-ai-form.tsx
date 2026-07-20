@@ -4,7 +4,7 @@ import { getAiConfigList, getAiConfig } from '@/lib/settings/ai-config-store';
 import { QueryType } from '@/lib/query';
 import type { RULE_AI_TYPE, RuleAiInfo, Rule } from '@/lib/rules';
 import type { FC } from 'react';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { chat } from '@/lib/ai-client';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -32,18 +32,29 @@ export const RuleAiForm: FC = () => {
   const form = useFormContext<Rule<typeof RULE_AI_TYPE, RuleAiInfo>>();
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showErrorDetail, setShowErrorDetail] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
 
   const { data: apiConfigs = [] } = useQuery({
     queryKey: [QueryType.AiConfigList],
     queryFn: getAiConfigList,
   });
 
+  function handleCancel() {
+    if (abortRef.current) {
+      abortRef.current.abort();
+      abortRef.current = null;
+    }
+    setIsGenerating(false);
+    setError('已取消生成');
+  }
+
   async function handleGenerate() {
     const apiConfigId = form.getValues('info.apiConfigId');
     const prompt = form.getValues('info.prompt');
 
     if (!apiConfigId) {
-      setError('请选择API配置');
+      setError('请选择 API 配置');
       return;
     }
     if (!prompt) {
@@ -53,11 +64,15 @@ export const RuleAiForm: FC = () => {
 
     setIsGenerating(true);
     setError(null);
+    setShowErrorDetail(false);
+
+    const controller = new AbortController();
+    abortRef.current = controller;
 
     try {
       const apiConfig = await getAiConfig(apiConfigId);
       if (!apiConfig) {
-        setError('未找到API配置');
+        setError('未找到 API 配置');
         return;
       }
 
@@ -73,16 +88,25 @@ export const RuleAiForm: FC = () => {
 示例代码模板：
 ${SCRIPT_TEMPLATE}`;
 
-      const response = await chat(apiConfig, [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: prompt },
-      ]);
+      const response = await chat(
+        apiConfig,
+        [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: prompt },
+        ],
+        { signal: controller.signal, timeout: 30000 },
+      );
 
       form.setValue('info.generatedScript', response.content);
     } catch (err) {
-      setError(err instanceof Error ? err.message : '生成失败');
+      if (controller.signal.aborted) {
+        return; // 用户主动取消，不显示错误
+      }
+      const msg = err instanceof Error ? err.message : '生成失败';
+      setError(msg);
     } finally {
       setIsGenerating(false);
+      abortRef.current = null;
     }
   }
 
@@ -93,17 +117,22 @@ ${SCRIPT_TEMPLATE}`;
         name="info.apiConfigId"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>API配置</FormLabel>
+            <FormLabel>API 配置</FormLabel>
             <Select onValueChange={field.onChange} defaultValue={field.value}>
               <FormControl>
                 <SelectTrigger>
-                  <SelectValue placeholder="选择API配置" />
+                  <SelectValue placeholder="选择 API 配置" />
                 </SelectTrigger>
               </FormControl>
               <SelectContent>
+                {apiConfigs.length === 0 && (
+                  <div className="px-2 py-4 text-sm text-muted-foreground text-center">
+                    暂无配置，请先在设置中添加
+                  </div>
+                )}
                 {apiConfigs.map((config) => (
                   <SelectItem key={config.id} value={config.id}>
-                    {config.name || config.type} - {config.baseUrl}
+                    {config.name || '未命名'} ({config.type})
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -129,15 +158,40 @@ ${SCRIPT_TEMPLATE}`;
         )}
       />
 
-      {error && <p className="text-destructive text-sm">{error}</p>}
+      {error && (
+        <div className="space-y-1">
+          <p className="text-destructive text-sm">{error}</p>
+          {error.length > 100 && (
+            <button
+              type="button"
+              className="text-xs text-muted-foreground underline"
+              onClick={() => setShowErrorDetail(!showErrorDetail)}
+            >
+              {showErrorDetail ? '收起' : '查看完整错误'}
+            </button>
+          )}
+          {showErrorDetail && (
+            <pre className="bg-muted p-2 rounded text-xs overflow-auto max-h-32 whitespace-pre-wrap break-all">
+              {error}
+            </pre>
+          )}
+        </div>
+      )}
 
-      <Button
-        type="button"
-        onClick={handleGenerate}
-        disabled={isGenerating}
-      >
-        {isGenerating ? '生成中...' : '生成脚本'}
-      </Button>
+      <div className="flex gap-2">
+        <Button
+          type="button"
+          onClick={handleGenerate}
+          disabled={isGenerating}
+        >
+          {isGenerating ? '生成中...' : '生成脚本'}
+        </Button>
+        {isGenerating && (
+          <Button type="button" variant="outline" onClick={handleCancel}>
+            取消
+          </Button>
+        )}
+      </div>
 
       <FormField
         control={form.control}

@@ -70,3 +70,13 @@ export function getApiTypeLabel(type: ApiConfigType): string {
   };
   return labels[type];
 }
+
+/** 各平台的已知可用模型，用于 UI 下拉选择 */
+export const KNOWN_MODELS: Record<ApiConfigType, string[]> = {
+  ollama: ['llama3.2', 'mistral', 'neural-chat', 'codellama', 'qwen2.5'],
+  openai: ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo', 'gpt-3.5-turbo'],
+  deepseek: ['deepseek-chat', 'deepseek-reasoner'],
+  groq: ['mixtral-8x7b-32768', 'llama3-70b-8192', 'llama3-8b-8192', 'gemma2-9b-it'],
+  claude: ['claude-3-5-sonnet-20241022', 'claude-3-opus-20240229', 'claude-3-haiku-20240307'],
+  'openai-compatible': [],
+};
