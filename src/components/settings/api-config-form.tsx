@@ -162,21 +162,19 @@ export function ApiConfigForm({
             <FormItem>
               <FormLabel>模型名称</FormLabel>
               <FormControl>
-                <>
-                  <Input
-                    placeholder={PLACEHOLDERS[currentType].model}
-                    list={models.length > 0 ? modelListId : undefined}
-                    {...field}
-                  />
-                  {models.length > 0 && (
-                    <datalist id={modelListId}>
-                      {models.map((m) => (
-                        <option key={m} value={m} />
-                      ))}
-                    </datalist>
-                  )}
-                </>
+                <Input
+                  placeholder={PLACEHOLDERS[currentType].model}
+                  list={models.length > 0 ? modelListId : undefined}
+                  {...field}
+                />
               </FormControl>
+              {models.length > 0 && (
+                <datalist id={modelListId}>
+                  {models.map((m) => (
+                    <option key={m} value={m} />
+                  ))}
+                </datalist>
+              )}
               <FormMessage />
             </FormItem>
           )}
