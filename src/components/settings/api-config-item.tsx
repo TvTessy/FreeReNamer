@@ -1,7 +1,7 @@
 import { IconPencil, IconTrash } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import type { ApiConfig } from '@/lib/settings/ai-config';
+import { getApiTypeLabel, type ApiConfig } from '@/lib/settings/ai-config';
 
 interface ApiConfigItemProps {
   config: ApiConfig;
@@ -17,13 +17,13 @@ export function ApiConfigItem({ config, onEdit, onDelete }: ApiConfigItemProps) 
           <div className="flex items-center gap-2">
             <span className="font-medium">{config.name || '未命名'}</span>
             <span className="rounded bg-secondary px-2 py-0.5 text-xs">
-              {config.type === 'ollama' ? 'Ollama' : 'OpenAI'}
+              {getApiTypeLabel(config.type)}
             </span>
           </div>
           <div className="text-muted-foreground text-sm">
             {config.baseUrl} / {config.model}
           </div>
-          {config.type === 'openai' && config.apiKey && (
+          {config.apiKey && (
             <div className="text-muted-foreground text-xs">密钥: {'*'.repeat(8)}</div>
           )}
         </div>

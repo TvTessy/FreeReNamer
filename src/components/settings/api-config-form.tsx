@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { ApiConfigSchema, getDefaultApiConfig, type ApiConfig } from '@/lib/settings/ai-config';
+import { ApiConfigSchema, getDefaultApiConfig, getApiTypeLabel, type ApiConfig, type ApiConfigType } from '@/lib/settings/ai-config';
 
 interface ApiConfigFormProps {
   defaultValues?: Partial<ApiConfig>;
@@ -55,14 +55,16 @@ export function ApiConfigForm({
                 <RadioGroup
                   onValueChange={field.onChange}
                   defaultValue={field.value}
-                  className="flex space-x-4"
+                  className="grid grid-cols-2 gap-4"
                 >
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="ollama" id="ollama" />
-                    <Label htmlFor="ollama" className="font-normal">
-                      Ollama
-                    </Label>
-                  </div>
+                  {(['ollama', 'openai', 'deepseek', 'groq', 'claude', 'openai-compatible'] as const).map((type) => (
+                    <div key={type} className="flex items-center space-x-2">
+                      <RadioGroupItem value={type} id={type} />
+                      <Label htmlFor={type} className="font-normal">
+                        {getApiTypeLabel(type)}
+                      </Label>
+                    </div>
+                  ))}
                 </RadioGroup>
               </FormControl>
               <FormMessage />
@@ -73,34 +75,83 @@ export function ApiConfigForm({
         <FormField
           control={form.control}
           name="baseUrl"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>服务器地址</FormLabel>
-              <FormControl>
-                <Input placeholder="http://localhost:11434" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
+          render={({ field }) => {
+            const type = form.watch('type') as ApiConfigType;
+            const placeholders: Record<ApiConfigType, string> = {
+              ollama: 'http://localhost:11434',
+              openai: 'https://api.openai.com/v1',
+              deepseek: 'https://api.deepseek.com/v1',
+              groq: 'https://api.groq.com/openai/v1',
+              claude: 'https://api.anthropic.com/v1',
+              'openai-compatible': 'http://localhost:8000/v1',
+            };
+            return (
+              <FormItem>
+                <FormLabel>服务器地址</FormLabel>
+                <FormControl>
+                  <Input placeholder={placeholders[type]} {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            );
+          }}
         />
 
         <FormField
           control={form.control}
           name="model"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>模型名称</FormLabel>
-              <FormControl>
-                <Input
-                  placeholder="llama3.2"
-                  {...field}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
+          render={({ field }) => {
+            const type = form.watch('type') as ApiConfigType;
+            const placeholders: Record<ApiConfigType, string> = {
+              ollama: 'llama3.2',
+              openai: 'gpt-4o-mini',
+              deepseek: 'deepseek-chat',
+              groq: 'mixtral-8x7b-32768',
+              claude: 'claude-3-5-sonnet-20241022',
+              'openai-compatible': 'your-model-name',
+            };
+            return (
+              <FormItem>
+                <FormLabel>模型名称</FormLabel>
+                <FormControl>
+                  <Input placeholder={placeholders[type]} {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            );
+          }}
         />
 
+        {form.watch('type') !== 'ollama' && (
+          <FormField
+            control={form.control}
+            name="apiKey"
+            render={({ field }) => {
+              const type = form.watch('type') as ApiConfigType;
+              const keyLabels: Record<ApiConfigType, string> = {
+                ollama: 'API Key',
+                openai: 'OpenAI API Key',
+                deepseek: 'Deepseek API Key',
+                groq: 'Groq API Key',
+                claude: 'Claude API Key',
+                'openai-compatible': 'API Key（可选）',
+              };
+              return (
+                <FormItem>
+                  <FormLabel>{keyLabels[type]}</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="password"
+                      placeholder="sk-xxxxx..."
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              );
+            }}
+          />
+        )}
 
         <div className="flex justify-end gap-2">
           {onCancel && (

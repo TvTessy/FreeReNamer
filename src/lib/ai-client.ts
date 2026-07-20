@@ -40,6 +40,7 @@ export async function chat(
   if (config.type === 'ollama') {
     return chatOllama(config, messages);
   }
+  // OpenAI 兼容的 API（包括 OpenAI、Deepseek、Groq、Claude、通用兼容）
   return chatOpenAI(config, messages);
 }
 
