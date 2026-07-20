@@ -1,18 +1,11 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import {
   ApiConfigSchema,
   getDefaultApiConfig,
@@ -42,6 +35,15 @@ const ENDPOINT_HINTS: Record<ApiConfigType, string> = {
   'openai-compatible': '/chat/completions',
 };
 
+const PLACEHOLDERS: Record<ApiConfigType, { url: string; model: string }> = {
+  ollama: { url: 'http://localhost:11434', model: 'llama3.2' },
+  openai: { url: 'https://api.openai.com/v1', model: 'gpt-4o-mini' },
+  deepseek: { url: 'https://api.deepseek.com/v1', model: 'deepseek-chat' },
+  groq: { url: 'https://api.groq.com/openai/v1', model: 'mixtral-8x7b-32768' },
+  claude: { url: 'https://api.anthropic.com/v1', model: 'claude-3-5-sonnet-20241022' },
+  'openai-compatible': { url: 'http://localhost:8000/v1', model: 'your-model-name' },
+};
+
 export function ApiConfigForm({
   defaultValues,
   onSubmit,
@@ -62,6 +64,7 @@ export function ApiConfigForm({
 
   const currentType = (form.watch('type') as ApiConfigType) ?? 'ollama';
   const models = KNOWN_MODELS[currentType] ?? [];
+  const modelListId = `model-list-${currentType}`;
 
   const handleTestConnection = async () => {
     const values = form.getValues();
@@ -69,6 +72,7 @@ export function ApiConfigForm({
     if (!valid.success) {
       setTestStatus('error');
       setTestResult('请先填写完整的配置信息');
+      setShowDebug(false);
       return;
     }
 
@@ -76,9 +80,14 @@ export function ApiConfigForm({
     setTestResult('正在测试连接...');
     setShowDebug(false);
 
-    const result = await testConnection(valid.data);
-    setTestStatus(result.success ? 'success' : 'error');
-    setTestResult(result.message);
+    try {
+      const result = await testConnection(valid.data);
+      setTestStatus(result.success ? 'success' : 'error');
+      setTestResult(String(result.message ?? ''));
+    } catch (err) {
+      setTestStatus('error');
+      setTestResult(err instanceof Error ? err.message : '测试失败');
+    }
   };
 
   return (
@@ -131,95 +140,46 @@ export function ApiConfigForm({
         <FormField
           control={form.control}
           name="baseUrl"
-          render={({ field }) => {
-            const placeholders: Record<ApiConfigType, string> = {
-              ollama: 'http://localhost:11434',
-              openai: 'https://api.openai.com/v1',
-              deepseek: 'https://api.deepseek.com/v1',
-              groq: 'https://api.groq.com/openai/v1',
-              claude: 'https://api.anthropic.com/v1',
-              'openai-compatible': 'http://localhost:8000/v1',
-            };
-            return (
-              <FormItem>
-                <FormLabel>服务器地址</FormLabel>
-                <FormControl>
-                  <Input placeholder={placeholders[currentType]} {...field} />
-                </FormControl>
-                <FormDescription>
-                  请求地址：{field.value || placeholders[currentType]}{ENDPOINT_HINTS[currentType]}
-                </FormDescription>
-                <FormMessage />
-              </FormItem>
-            );
-          }}
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>服务器地址</FormLabel>
+              <FormControl>
+                <Input placeholder={PLACEHOLDERS[currentType].url} {...field} />
+              </FormControl>
+              <p className="text-xs text-muted-foreground mt-1">
+                请求路径：{field.value || PLACEHOLDERS[currentType].url}{ENDPOINT_HINTS[currentType]}
+              </p>
+              <FormMessage />
+            </FormItem>
+          )}
         />
 
-        {/* 模型名称（下拉 + 手动输入） */}
+        {/* 模型名称 */}
         <FormField
           control={form.control}
           name="model"
-          render={({ field }) => {
-            const placeholders: Record<ApiConfigType, string> = {
-              ollama: 'llama3.2',
-              openai: 'gpt-4o-mini',
-              deepseek: 'deepseek-chat',
-              groq: 'mixtral-8x7b-32768',
-              claude: 'claude-3-5-sonnet-20241022',
-              'openai-compatible': 'your-model-name',
-            };
-            const placeholder = placeholders[currentType];
-
-            return (
-              <FormItem>
-                <FormLabel>模型名称</FormLabel>
-                {models.length > 0 ? (
-                  <div className="space-y-2">
-                    <Select
-                      value={field.value}
-                      onValueChange={(v) => {
-                        field.onChange(v);
-                        // 触发表单验证
-                        form.trigger('model');
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder={placeholder} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {models.map((m) => (
-                          <SelectItem key={m} value={m}>
-                            {m}
-                          </SelectItem>
-                        ))}
-                        <SelectItem value="__custom__">✏️ 手动输入...</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {field.value === '__custom__' && (
-                      <FormControl>
-                        <Input
-                          placeholder={`输入模型名称，如 ${placeholder}`}
-                          value=""
-                          onChange={(e) => field.onChange(e.target.value)}
-                          autoFocus
-                        />
-                      </FormControl>
-                    )}
-                    {field.value && field.value !== '__custom__' && (
-                      <p className="text-xs text-muted-foreground">
-                        当前：{field.value}
-                      </p>
-                    )}
-                  </div>
-                ) : (
-                  <FormControl>
-                    <Input placeholder={placeholder} {...field} />
-                  </FormControl>
-                )}
-                <FormMessage />
-              </FormItem>
-            );
-          }}
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>模型名称</FormLabel>
+              <FormControl>
+                <>
+                  <Input
+                    placeholder={PLACEHOLDERS[currentType].model}
+                    list={models.length > 0 ? modelListId : undefined}
+                    {...field}
+                  />
+                  {models.length > 0 && (
+                    <datalist id={modelListId}>
+                      {models.map((m) => (
+                        <option key={m} value={m} />
+                      ))}
+                    </datalist>
+                  )}
+                </>
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
         />
 
         {/* API Key（非 Ollama 显示） */}
@@ -251,37 +211,40 @@ export function ApiConfigForm({
 
         {/* 测试连接按钮 */}
         <div className="border-t pt-4 space-y-2">
-          <div className="flex items-center gap-3">
+          <div className="flex flex-col gap-2">
             <Button
               type="button"
               variant="outline"
               size="sm"
+              className="w-fit"
               onClick={handleTestConnection}
               disabled={testStatus === 'loading'}
             >
               {testStatus === 'loading' ? '⏳ 测试中...' : '🔍 测试连接'}
             </Button>
             {testStatus === 'success' && (
-              <span className="text-sm text-green-500">✅ {testResult}</span>
+              <p className="text-sm text-green-500">✅ {testResult}</p>
             )}
             {testStatus === 'error' && testResult && (
-              <span className="text-sm text-red-500">
-                ❌ 连接失败
-                <button
-                  type="button"
-                  className="ml-2 underline text-xs"
-                  onClick={() => setShowDebug(!showDebug)}
-                >
-                  查看详情
-                </button>
-              </span>
+              <div>
+                <p className="text-sm text-red-500">
+                  ❌ 连接失败
+                  <button
+                    type="button"
+                    className="ml-2 underline text-xs"
+                    onClick={() => setShowDebug(!showDebug)}
+                  >
+                    {showDebug ? '收起' : '查看详情'}
+                  </button>
+                </p>
+                {showDebug && (
+                  <pre className="bg-muted p-3 rounded text-xs overflow-auto max-h-40 whitespace-pre-wrap break-all mt-2">
+                    {testResult}
+                  </pre>
+                )}
+              </div>
             )}
           </div>
-          {showDebug && testStatus === 'error' && (
-            <pre className="bg-muted p-3 rounded text-xs overflow-auto max-h-40 whitespace-pre-wrap break-all">
-              {testResult}
-            </pre>
-          )}
         </div>
 
         {/* 提交按钮 */}
